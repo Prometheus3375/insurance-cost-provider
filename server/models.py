@@ -105,6 +105,14 @@ type PlainTariffList = Annotated[
 ]
 type PlainTariffData = Annotated[dict[date, PlainTariffList], AfterValidator(validate_tariff_data)]
 
+
+class SimpleResponse(BaseModel, frozen=True):
+    """
+    Model for simple text responses.
+    """
+    detail: str
+
+
 __all__ = (
     'Settings',
     'CargoType',
@@ -112,4 +120,5 @@ __all__ = (
     'Tariff',
     'PlainTariffList',
     'PlainTariffData',
+    'SimpleResponse',
     )
