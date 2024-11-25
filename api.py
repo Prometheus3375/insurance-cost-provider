@@ -159,8 +159,8 @@ async def api_delete_cargo_type(
 @app.post('/api/internal/tariffs/load')
 async def api_load_tariffs(
         *,
-        data: TariffData,
         db_requester: DBRequester,
+        data: Annotated[PlainTariffData, Body()],
         ) -> None:
     """
     todo
