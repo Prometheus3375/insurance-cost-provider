@@ -3,10 +3,8 @@ from logging import getLogger
 from typing import final
 
 from sqlalchemy import (
-    BigInteger,
     Date,
     Double,
-    ForeignKey,
     PrimaryKeyConstraint,
     String,
     select,
@@ -15,7 +13,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from server.models import CargoType, RawCargoType, Tariff
+from server.models import CargoType, Tariff
 
 logger = getLogger(__name__)
 
@@ -26,26 +24,22 @@ class BaseTable(DeclarativeBase):
     """
 
 
-class CargoTypeTable(BaseTable):
-    __tablename__ = 'cargo_types'
-
-    id: Mapped[int] = mapped_column(BigInteger, autoincrement=True, primary_key=True)
-    name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-
-
 class TariffTable(BaseTable):
     __tablename__ = 'tariffs'
 
     date: Mapped[date] = mapped_column(Date, nullable=False)
-    cargo_type: Mapped[int] = mapped_column(
-        ForeignKey(CargoTypeTable.id, ondelete='CASCADE'),
-        nullable=False,
-        )
+    cargo_type: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     rate: Mapped[float] = mapped_column(Double, nullable=False)
 
     __table_args__ = (
         PrimaryKeyConstraint(date, cargo_type, name='unique_date_cargo_type'),
         )
+
+    def to_model(self, /) -> Tariff:
+        """
+        Converts this row to a model instance.
+        """
+        return Tariff.model_validate(self)
 
 
 @final
