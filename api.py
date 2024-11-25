@@ -4,66 +4,89 @@ from datetime import date
 from logging import getLogger
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Body, Depends, FastAPI, Request
 from fastapi.exception_handlers import request_validation_exception_handler
-from fastapi.exceptions import RequestValidationError
-from psycopg_pool import AsyncConnectionPool
+from fastapi.exceptions import HTTPException, RequestValidationError
 from pydantic import PositiveFloat
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
+from starlette import status
 
 from server.db import *
 from server.models import *
 
 settings: Settings
-connection_pool: AsyncConnectionPool
+engine: AsyncEngine
+session_maker: async_sessionmaker
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI, /) -> Iterator[None]:
-    global settings, connection_pool
     # Actions on startup
+    from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
+
+    global settings, engine, session_maker
     settings = Settings()
 
-    if not (await verify_connectivity(settings.database_uri)):
-        raise ValueError('environmental variable DATABASE_URI is not properly set')
-
-    connection_pool = AsyncConnectionPool(
+    engine = create_async_engine(
         settings.database_uri,
-        kwargs=None,
-        min_size=settings.connection_pool_min_size,
-        max_size=settings.connection_pool_max_size,
-        open=False,
-        configure=configure_connection,
-        check=AsyncConnectionPool.check_connection,
-        name='Global PostgreSQL connection pool',
+        # connect_args=dict(autocommit=True),
+        pool_size=settings.pool_size,
+        max_overflow=settings.pool_overflow,
+        pool_recycle=settings.pool_recycle,
+        pool_timeout=settings.pool_timeout,
         )
 
-    await connection_pool.open()
-    await connection_pool.wait()
-    logger.info(
-        f'Connection pool is ready. '
-        f'Min size is {connection_pool.min_size}, '
-        f'max size is {connection_pool.max_size}'
-        )
+    session_maker = async_sessionmaker(engine, autobegin=False)
+
+    logger.info(f'Verifying connectivity to the database {settings.database_redacted_uri}')
+    connection: AsyncConnection
+    async with engine.begin() as connection:
+        logger.info('Connection to the database can be established successfully')
+        # Ensure tables exist
+        await connection.run_sync(BaseTable.metadata.create_all)
+
     yield
     # Actions on shutdown
-    await connection_pool.close()
+    await engine.dispose()
 
 
-async def make_db_requester() -> Iterator[PostgreSQLRequester]:
+async def make_db_requester() -> Iterator[DatabaseRequester]:
     """
-    Dependency function for creating an instance of :class:`PostgreSQLRequester`.
+    Dependency function for creating an instance of :class:`DatabaseRequester`.
     """
-    async with connection_pool.connection() as conn:
-        yield PostgreSQLRequester(conn)
+    async with session_maker.begin() as session:
+        yield DatabaseRequester(session)
 
 
-type DBRequesterType = Annotated[PostgreSQLRequester, Depends(make_db_requester)]
+# https://github.com/fastapi/fastapi/issues/10719
+DBRequester = Annotated[DatabaseRequester, Depends(make_db_requester)]
+
+
+async def verify_cargo_type(
+        *,
+        db_requester: DBRequester,
+        cargo_type: RawCargoType,
+        ) -> CargoType:
+    """
+    Dependency function for verifying passed cargo types.
+    """
+    result = await db_requester.fetch_cargo_type(cargo_type)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f'Cargo type {cargo_type!r} not found',
+            )
+
+    return result
+
+
+type ValidCargoType = Annotated[CargoType, Depends(verify_cargo_type)]
+logger = getLogger(__name__)
 app = FastAPI(
     title='Cost Evaluation API',
     version='1.0.0',
     lifespan=lifespan,
     )
-logger = getLogger(__name__)
 
 
 @app.exception_handler(RequestValidationError)
@@ -86,9 +109,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.get('/api/public/evaluate_cost')
 async def api_evaluate_cost(
         *,
-        db_requester: DBRequesterType,
+        db_requester: DBRequester,
         ensurance_date: date,
-        cargo_type: CargoType,
+        cargo_type: ValidCargoType,
         declared_price: PositiveFloat,
         ) -> PositiveFloat:
     """
@@ -102,9 +125,9 @@ async def api_evaluate_cost(
 @app.get('/api/internal/{cargo_type}/add')
 async def api_add_cargo_type(
         *,
-        db_requester: DBRequesterType,
-        cargo_type: CargoType,
-        ) -> None:
+        db_requester: DBRequester,
+        cargo_type: RawCargoType,
+        ) -> str:
     """
     todo
     """
@@ -114,8 +137,8 @@ async def api_add_cargo_type(
 @app.get('/api/internal/{cargo_type}/delete')
 async def api_delete_cargo_type(
         *,
-        db_requester: DBRequesterType,
-        cargo_type: CargoType,
+        db_requester: DBRequester,
+        cargo_type: ValidCargoType,
         ) -> None:
     """
     todo
@@ -126,8 +149,8 @@ async def api_delete_cargo_type(
 @app.post('/api/internal/tariffs/load')
 async def api_load_tariffs(
         *,
-        db_requester: DBRequesterType,
         data: TariffData,
+        db_requester: DBRequester,
         ) -> None:
     """
     todo
@@ -139,9 +162,9 @@ async def api_load_tariffs(
 @app.get('/api/internal/tariffs/edit')
 async def api_edit_tariff(
         *,
-        db_requester: DBRequesterType,
+        db_requester: DBRequester,
         tariff_date: date,
-        cargo_type: CargoType,
+        cargo_type: ValidCargoType,
         new_rate: PositiveFloat,
         ) -> None:
     """
@@ -153,9 +176,9 @@ async def api_edit_tariff(
 @app.get('/api/internal/tariffs/delete')
 async def api_delete_tariff(
         *,
-        db_requester: DBRequesterType,
+        db_requester: DBRequester,
         tariff_date: date,
-        cargo_type: CargoType,
+        cargo_type: ValidCargoType,
         ) -> None:
     """
     todo
