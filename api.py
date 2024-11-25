@@ -1,6 +1,5 @@
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
-from datetime import date
 from logging import getLogger
 from typing import Annotated
 
@@ -61,27 +60,6 @@ async def make_db_requester() -> Iterator[DatabaseRequester]:
 
 # https://github.com/fastapi/fastapi/issues/10719
 DBRequester = Annotated[DatabaseRequester, Depends(make_db_requester)]
-
-
-async def verify_cargo_type(
-        *,
-        db_requester: DBRequester,
-        cargo_type: RawCargoType,
-        ) -> CargoType:
-    """
-    Dependency function for verifying passed cargo types.
-    """
-    result = await db_requester.fetch_cargo_type(cargo_type)
-    if result is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f'Cargo type {cargo_type!r} not found',
-            )
-
-    return result
-
-
-type ValidCargoType = Annotated[CargoType, Depends(verify_cargo_type)]
 logger = getLogger(__name__)
 app = FastAPI(
     title='Cost Evaluation API',
@@ -111,60 +89,29 @@ async def validation_exception_handler(
     return await request_validation_exception_handler(request, exc)
 
 
-@app.get('/api/public/evaluate_cost')
+@app.post('/api/public/evaluate_cost')
 async def api_evaluate_cost(
         *,
         db_requester: DBRequester,
-        ensurance_date: date,
-        cargo_type: ValidCargoType,
-        declared_price: PositiveFloat,
+        tariff_type: TariffType,
+        declared_price: Annotated[PositiveFloat, Body(embed=True)],
         ) -> PositiveFloat:
     """
-    todo
+    Evaluates cost using specified tariff type and declared price.
+    Returns status 404 if specified tariff type does not exist.
     """
-    tariff = await db_requester.fetch_tariff(ensurance_date, cargo_type)
+    tariff = await db_requester.fetch_tariff(
+        ensurance_date=tariff_type.date,
+        cargo_type=tariff_type.cargo_type,
+        )
+
     if tariff is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f'Tariff for {cargo_type!r} on {ensurance_date} not found',
+            detail=f'Tariff for {tariff_type.cargo_type!r} on {tariff_type.date} is not found',
             )
 
     return tariff.rate * declared_price
-
-
-@app.get('/api/internal/cargo-type/list')
-async def api_add_cargo_type(
-        *,
-        db_requester: DBRequester,
-        ) -> list[CargoType]:
-    """
-    todo
-    """
-
-
-@app.get('/api/internal/cargo-type/add/{cargo_type}')
-async def api_add_cargo_type(
-        *,
-        db_requester: DBRequester,
-        cargo_type: RawCargoType,
-        ) -> str:
-    """
-    todo
-    """
-    result = await db_requester.add_cargo_types(cargo_type)
-    return 'Success' if result else 'Already exists'
-
-
-@app.get('/api/internal/cargo-type/delete/{cargo_type}')
-async def api_delete_cargo_type(
-        *,
-        db_requester: DBRequester,
-        cargo_type: ValidCargoType,
-        ) -> None:
-    """
-    todo
-    """
-    # todo log who did that to kafka
 
 
 @app.post('/api/internal/tariffs/load')
@@ -172,36 +119,61 @@ async def api_load_tariffs(
         *,
         db_requester: DBRequester,
         data: Annotated[PlainTariffData, Body()],
-        ) -> None:
+        ) -> list[Tariff]:
     """
-    todo
+    Loads tariffs to the database.
+    If any tariff from the payload already exists in the database,
+    then updates its rate value if new one is different.
+    Returns the list of added and updated tariffs.
     """
-    # todo log who did that to kafka
-    # todo use edit and add for this
+    tariffs = (
+        Tariff(date=date_, cargo_type=plain_tariff.cargo_type, rate=plain_tariff.rate)
+        for date_, plain_tariff_list in data.items()
+        for plain_tariff in plain_tariff_list
+        )
+    return await db_requester.add_tariffs(*tariffs)
 
 
-@app.get('/api/internal/tariffs/edit')
+@app.post('/api/internal/tariffs/edit')
 async def api_edit_tariff(
         *,
         db_requester: DBRequester,
-        tariff_date: date,
-        cargo_type: ValidCargoType,
-        new_rate: PositiveFloat,
-        ) -> None:
+        tariff: Annotated[Tariff, Body()],
+        ) -> str:
     """
-    todo
+    Edits tariff with a new value of rate.
+    Returns status 304 if value is identical or such tariff does not exist.
     """
-    # todo log who did that to kafka
+    result = await db_requester.edit_tariff(tariff)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_304_NOT_MODIFIED,
+            detail=f'Tariff for {tariff.cargo_type!r} on {tariff.date} does not exist '
+                   f'or already has such value of rate',
+            )
+
+    return 'Success'
 
 
-@app.get('/api/internal/tariffs/delete')
+@app.post('/api/internal/tariffs/delete')
 async def api_delete_tariff(
         *,
         db_requester: DBRequester,
-        tariff_date: date,
-        cargo_type: ValidCargoType,
-        ) -> None:
+        tariff_type: Annotated[TariffType, Body()],
+        ) -> Tariff:
     """
-    todo
+    Deletes tariff specified by its date and cargo type.
+    Returns status 404 if such tariff does not exist.
     """
-    # todo log who did that to kafka
+    result = await db_requester.delete_tariff(
+        ensurance_date=tariff_type.date,
+        cargo_type=tariff_type.cargo_type,
+        )
+
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Tariff for {tariff_type.cargo_type!r} on {tariff_type.date} is not found',
+            )
+
+    return result
