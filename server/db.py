@@ -119,7 +119,7 @@ class DatabaseRequester:
                 TariffTable.cargo_type == tariff.cargo_type,
                 TariffTable.rate != tariff.rate,
                 )
-            .values([dict(rate=tariff.rate)])
+            .values(dict(rate=tariff.rate))
             .returning(TariffTable)
         )
         result = (await self._session.scalars(query)).first()
