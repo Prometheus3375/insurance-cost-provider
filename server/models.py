@@ -1,21 +1,60 @@
 from collections import defaultdict
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import (
     AfterValidator,
     BaseModel,
     NonNegativeInt,
     PositiveFloat,
+    PositiveInt,
     StringConstraints,
     )
 from pydantic_settings import BaseSettings
 
 type NonEmptyString = Annotated[str, StringConstraints(min_length=1)]
-type CargoType = NonEmptyString
 
 
-class Tariff(BaseModel, frozen=True):
+class Settings(BaseSettings, env_ignore_empty=True):
+    """
+    Model for holding server settings.
+    """
+    database_user: NonEmptyString
+    database_password: NonEmptyString
+    database_host: NonEmptyString
+    database_port: PositiveInt
+    database_dbname: NonEmptyString
+
+    pool_size: NonNegativeInt = 5
+    pool_overflow: NonNegativeInt = 10
+    pool_recycle: PositiveFloat | Literal[-1] = 3600
+    pool_timeout: PositiveFloat = 30
+
+    @property
+    def database_uri(self, /) -> str:
+        """
+        URI of the database.
+        """
+        return (
+            f'postgresql+psycopg://{self.database_user}:{self.database_password}@'
+            f'{self.database_host}:{self.database_port}/{self.database_dbname}'
+        )
+
+    @property
+    def database_redacted_uri(self, /) -> str:
+        """
+        URI of the database with password redacted.
+        """
+        return (
+            f'postgresql+psycopg://{self.database_user}:REDACTED@'
+            f'{self.database_host}:{self.database_port}/{self.database_dbname}'
+        )
+
+
+type RawCargoType = Annotated[str, StringConstraints(min_length=1, max_length=50)]
+
+
+class CargoType(BaseModel, frozen=True, from_attributes=True):
     """
     Model for tariffs of a certain date.
     """
