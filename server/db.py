@@ -58,7 +58,7 @@ class DatabaseRequester:
             self,
             /,
             *,
-            ensurance_date: date,
+            tariff_date: date,
             cargo_type: CargoType,
             ) -> Tariff | None:
         """
@@ -68,7 +68,7 @@ class DatabaseRequester:
         query = (
             select(TariffTable)
             .where(
-                TariffTable.date == ensurance_date,
+                TariffTable.date == tariff_date,
                 TariffTable.cargo_type == cargo_type,
                 )
         )
@@ -135,7 +135,7 @@ class DatabaseRequester:
             self,
             /,
             *,
-            ensurance_date: date,
+            tariff_date: date,
             cargo_type: CargoType,
             ) -> Tariff | None:
         """
@@ -146,7 +146,7 @@ class DatabaseRequester:
         query = (
             delete(TariffTable)
             .where(
-                TariffTable.date == ensurance_date,
+                TariffTable.date == tariff_date,
                 TariffTable.cargo_type == cargo_type,
                 )
             .returning(TariffTable)

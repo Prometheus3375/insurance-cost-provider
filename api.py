@@ -114,7 +114,7 @@ async def api_evaluate_cost(
     Returns status 404 if tariff for such date and cargo type does not exist.
     """
     tariff = await db_requester.fetch_tariff(
-        ensurance_date=ensurance_date,
+        tariff_date=ensurance_date,
         cargo_type=cargo_type,
         )
 
@@ -176,7 +176,7 @@ async def api_delete_tariff(
     Returns status 404 if such tariff does not exist.
     """
     result = await db_requester.delete_tariff(
-        ensurance_date=tariff_date,
+        tariff_date=tariff_date,
         cargo_type=cargo_type,
         )
 
