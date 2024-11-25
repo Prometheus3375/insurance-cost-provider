@@ -92,7 +92,16 @@ async def validation_exception_handler(
     return await request_validation_exception_handler(request, exc)
 
 
-@app.post('/api/public/evaluate_cost')
+ResponseTariffNotFound = {404: dict(description='Tariff not found', model=SimpleResponse)}
+ResponseTariffNotModified = {
+    304: dict(
+        description='Tariff unchanged or not found',
+        model=None,
+        ),
+    }
+
+
+@app.post('/api/public/evaluate_cost', responses=ResponseTariffNotFound)
 async def api_evaluate_cost(
         *,
         db_requester: DBRequester,
@@ -138,28 +147,24 @@ async def api_load_tariffs(
     return await db_requester.add_tariffs(*tariffs)
 
 
-@app.post('/api/internal/tariffs/edit')
+@app.post('/api/internal/tariffs/edit', responses=ResponseTariffNotModified)
 async def api_edit_tariff(
         *,
         db_requester: DBRequester,
         tariff: Annotated[Tariff, Body()],
-        ) -> str:
+        ) -> SimpleResponse:
     """
     Edits tariff with a new value of rate.
     Returns status 304 if value is identical or such tariff does not exist.
     """
     result = await db_requester.edit_tariff(tariff)
     if result is None:
-        raise HTTPException(
-            status_code=status.HTTP_304_NOT_MODIFIED,
-            detail=f'Tariff for {tariff.cargo_type!r} on {tariff.date} does not exist '
-                   f'or already has such value of rate',
-            )
+        raise HTTPException(status.HTTP_304_NOT_MODIFIED)
 
-    return 'Success'
+    return SimpleResponse(detail='Success')
 
 
-@app.post('/api/internal/tariffs/delete')
+@app.post('/api/internal/tariffs/delete', responses=ResponseTariffNotFound)
 async def api_delete_tariff(
         *,
         db_requester: DBRequester,
