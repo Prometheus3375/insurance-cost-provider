@@ -117,9 +117,14 @@ async def api_evaluate_cost(
     """
     todo
     """
-    # todo request rate by cargo_type and ensurance date
-    rate = 1
-    return rate * declared_price
+    tariff = await db_requester.fetch_tariff(ensurance_date, cargo_type)
+    if tariff is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Tariff for {cargo_type!r} on {ensurance_date} not found',
+            )
+
+    return tariff.rate * declared_price
 
 
 @app.get('/api/internal/cargo-type/list')
@@ -141,7 +146,8 @@ async def api_add_cargo_type(
     """
     todo
     """
-    # todo log who did that to kafka
+    result = await db_requester.add_cargo_types(cargo_type)
+    return 'Success' if result else 'Already exists'
 
 
 @app.get('/api/internal/cargo-type/delete/{cargo_type}')
