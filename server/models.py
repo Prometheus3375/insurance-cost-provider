@@ -55,32 +55,19 @@ class Settings(BaseSettings, env_ignore_empty=True):
 type CargoType = Annotated[str, StringConstraints(min_length=1, max_length=50)]
 
 
-class BaseTariff(BaseModel, frozen=True):
-    """
-    Model for tariffs without specified date and rate.
-    """
-    cargo_type: CargoType
-
-
-class PlainTariff(BaseTariff, frozen=True):
+class PlainTariff(BaseModel, frozen=True):
     """
     Model for tariffs without a date.
     """
+    cargo_type: CargoType
     rate: PositiveFloat
 
 
-class TariffType(BaseTariff, frozen=True):
-    """
-    Model for tariffs without specified rate.
-    """
-    date: date
-
-
-class Tariff(TariffType, frozen=True, from_attributes=True):
+class Tariff(PlainTariff, frozen=True, from_attributes=True):
     """
     Model for tariffs.
     """
-    rate: PositiveFloat
+    date: date
 
 
 def validate_tariff_list(li: list[PlainTariff], /) -> list[PlainTariff]:
@@ -122,7 +109,6 @@ __all__ = (
     'Settings',
     'CargoType',
     'PlainTariff',
-    'TariffType',
     'Tariff',
     'PlainTariffList',
     'PlainTariffData',
