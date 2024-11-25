@@ -30,7 +30,7 @@ class TariffTable(BaseTable):
     __tablename__ = 'tariffs'
 
     date: Mapped[date] = mapped_column(Date, nullable=False)
-    cargo_type: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    cargo_type: Mapped[str] = mapped_column(String(50), nullable=False)
     rate: Mapped[float] = mapped_column(Double, nullable=False)
 
     __table_args__ = (
