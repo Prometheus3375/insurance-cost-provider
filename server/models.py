@@ -9,6 +9,7 @@ from pydantic import (
     PositiveFloat,
     PositiveInt,
     StringConstraints,
+    conlist,
     )
 from pydantic_settings import BaseSettings
 
@@ -102,8 +103,20 @@ def validate_tariff_list(li: list[PlainTariff], /) -> list[PlainTariff]:
     return li
 
 
-type PlainTariffList = Annotated[list[PlainTariff], AfterValidator(validate_tariff_list)]
-type PlainTariffData = dict[date, PlainTariffList]
+def validate_tariff_data(d: dict[date, list[PlainTariff]], /) -> dict[date, list[PlainTariff]]:
+    """
+    Validates that tariff data is non-empty.
+    """
+    if d: return d
+
+    raise ValueError(f'tariff data must be non-empty')
+
+
+type PlainTariffList = Annotated[
+    conlist(PlainTariff, min_length=1),
+    AfterValidator(validate_tariff_list),
+]
+type PlainTariffData = Annotated[dict[date, PlainTariffList], AfterValidator(validate_tariff_data)]
 
 __all__ = (
     'NonEmptyString',
