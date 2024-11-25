@@ -7,7 +7,9 @@ from sqlalchemy import (
     Double,
     PrimaryKeyConstraint,
     String,
+    delete,
     select,
+    update,
     )
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,48 +54,12 @@ class DatabaseRequester:
     def __init__(self, session: AsyncSession, /) -> None:
         self._session = session
 
-    async def fetch_cargo_type(self, cargo_type_name: RawCargoType, /) -> CargoType | None:
-        """
-        Fetches ID for the given cargo type name,
-        then returns :class:`CargoType` or ``None`` if no such cargo type exists.
-        """
-        query = select(CargoTypeTable).where(CargoTypeTable.name == cargo_type_name)
-        result = await self._session.scalars(query)
-        row = await result.first()
-        return CargoType.model_validate(row) if row else None
-
-    async def add_cargo_types(
-            self,
-            cargo_type_name: RawCargoType,
-            /,
-            *cargo_type_names: RawCargoType,
-            ) -> list[CargoType]:
-        """
-        Adds specified cargo types to the database if they are not present.
-        Returns the list of added cargo types.
-        """
-        vals = [dict(name=cargo_type_name)]
-        vals.extend(dict(name=name) for name in cargo_type_names)
-
-        query = (
-            insert(CargoTypeTable)
-            .values(vals)
-            .on_conflict_do_nothing()
-            .returning(CargoTypeTable)
-        )
-        result = await self._session.scalars(query)
-        li = [CargoType.model_validate(row) for row in result]
-        for row in li:
-            logger.info(f'Added cargo type {row}')
-            # todo log all added rows to kafka
-
-        return li
-
     async def fetch_tariff(
             self,
+            /,
+            *,
             ensurance_date: date,
             cargo_type: CargoType,
-            /
             ) -> Tariff | None:
         """
         Fetches tariff for the given date and cargo type,
@@ -101,13 +67,98 @@ class DatabaseRequester:
         """
         query = (
             select(TariffTable)
-            .where(TariffTable.date == ensurance_date)
-            .where(TariffTable.cargo_type == cargo_type.id)
+            .where(
+                TariffTable.date == ensurance_date,
+                TariffTable.cargo_type == cargo_type,
+                )
+        )
+        result = (await self._session.scalars(query)).first()
+        return result.to_model() if result else None
 
+    async def add_tariffs(
+            self,
+            tariff: Tariff,
+            /,
+            *tariffs: Tariff,
+            ) -> list[Tariff]:
+        """
+        Adds specified tariffs to the database if they are not present
+        and edits existing tariffs when necessary.
+        Returns the list of added and updated tariffs.
+        """
+        vals = [tariff.model_dump()]
+        vals.extend(t.model_dump() for t in tariffs)
+
+        query = insert(TariffTable).values(vals)
+        query = (
+            query.on_conflict_do_update(
+                constraint='unique_date_cargo_type',
+                set_=dict(rate=query.excluded.rate),
+                where=TariffTable.rate != query.excluded.rate,
+                )
+            .returning(TariffTable)
         )
         result = await self._session.scalars(query)
-        row = await result.first()
-        return Tariff(date=ensurance_date, cargo_type=cargo_type, rate=row.rate) if row else None
+        li = [row.to_model() for row in result]
+        for t in li:
+            logger.info(f'Added or updated tariff {t}')
+            # todo log all added rows to kafka
+
+        return li
+
+    async def edit_tariff(self, tariff: Tariff, /) -> Tariff | None:
+        """
+        Edits specified tariff via updating its rate value.
+        Returns the updated tariff or ``None``
+        if such tariff does not exist, or it already has such value for rate.
+        """
+        query = (
+            update(TariffTable)
+            .where(
+                TariffTable.date == tariff.date,
+                TariffTable.cargo_type == tariff.cargo_type,
+                TariffTable.rate != tariff.rate,
+                )
+            .values([dict(rate=tariff.rate)])
+            .returning(TariffTable)
+        )
+        result = (await self._session.scalars(query)).first()
+        if result:
+            new_tariff = result.to_model()
+            logger.info(f'Edited tariff {new_tariff}')
+            # todo log action to kafka
+            return new_tariff
+
+        return None
+
+    async def delete_tariff(
+            self,
+            /,
+            *,
+            ensurance_date: date,
+            cargo_type: CargoType,
+            ) -> Tariff | None:
+        """
+        Deletes tariff for the given date and cargo type.
+        Returns the deleted tariff or ``None``
+        if such tariff does not exist.
+        """
+        query = (
+            delete(TariffTable)
+            .where(
+                TariffTable.date == ensurance_date,
+                TariffTable.cargo_type == cargo_type,
+                )
+            .returning(TariffTable)
+        )
+        result = (await self._session.scalars(query)).first()
+        if result:
+            tariff = result.to_model()
+            logger.info(f'Deleted tariff {tariff}')
+            # todo log action to kafka
+            return tariff
+
+        return None
 
 
 __all__ = 'BaseTable', 'DatabaseRequester'
