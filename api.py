@@ -122,7 +122,17 @@ async def api_evaluate_cost(
     return rate * declared_price
 
 
-@app.get('/api/internal/{cargo_type}/add')
+@app.get('/api/internal/cargo-type/list')
+async def api_add_cargo_type(
+        *,
+        db_requester: DBRequester,
+        ) -> list[CargoType]:
+    """
+    todo
+    """
+
+
+@app.get('/api/internal/cargo-type/add/{cargo_type}')
 async def api_add_cargo_type(
         *,
         db_requester: DBRequester,
@@ -134,7 +144,7 @@ async def api_add_cargo_type(
     # todo log who did that to kafka
 
 
-@app.get('/api/internal/{cargo_type}/delete')
+@app.get('/api/internal/cargo-type/delete/{cargo_type}')
 async def api_delete_cargo_type(
         *,
         db_requester: DBRequester,
