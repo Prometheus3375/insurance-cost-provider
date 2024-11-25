@@ -51,31 +51,34 @@ class Settings(BaseSettings, env_ignore_empty=True):
         )
 
 
-type RawCargoType = Annotated[str, StringConstraints(min_length=1, max_length=50)]
+type CargoType = Annotated[str, StringConstraints(min_length=1, max_length=50)]
 
 
-class CargoType(BaseModel, frozen=True, from_attributes=True):
+class BaseTariff(BaseModel, frozen=True):
     """
-    Model for cargo types.
+    Model for tariffs without specified date and rate.
     """
-    id: PositiveInt
-    name: RawCargoType
-
-
-class Tariff(BaseModel, frozen=True, from_attributes=True):
-    """
-    Model for tariffs.
-    """
-    date: date
     cargo_type: CargoType
+
+
+class PlainTariff(BaseTariff, frozen=True):
+    """
+    Model for tariffs without a date.
+    """
     rate: PositiveFloat
 
 
-class PlainTariff(BaseModel, frozen=True):
+class TariffType(BaseTariff, frozen=True):
     """
-    Model for tariffs without dates and proper cargo types.
+    Model for tariffs without specified rate.
     """
-    cargo_type: RawCargoType
+    date: date
+
+
+class Tariff(TariffType, frozen=True, from_attributes=True):
+    """
+    Model for tariffs.
+    """
     rate: PositiveFloat
 
 
