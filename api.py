@@ -63,6 +63,8 @@ async def make_db_requester() -> Iterator[DatabaseRequester]:
 DBRequester = Annotated[DatabaseRequester, Depends(make_db_requester)]
 DateInBody = Annotated[date, Body(embed=True)]
 CargoTypeInBody = Annotated[CargoType, Body(embed=True)]
+PositiveFloatInBody = Annotated[PositiveFloat, Body(embed=True)]
+
 logger = getLogger(__name__)
 app = FastAPI(
     title='Cost Evaluation API',
@@ -107,7 +109,7 @@ async def api_evaluate_cost(
         db_requester: DBRequester,
         ensurance_date: DateInBody,
         cargo_type: CargoTypeInBody,
-        declared_price: Annotated[PositiveFloat, Body(embed=True)],
+        declared_price: PositiveFloatInBody,
         ) -> PositiveFloat:
     """
     Evaluates cost using specified date, cargo type and declared price.
@@ -151,12 +153,15 @@ async def api_load_tariffs(
 async def api_edit_tariff(
         *,
         db_requester: DBRequester,
-        tariff: Annotated[Tariff, Body()],
+        tariff_date: DateInBody,
+        cargo_type: CargoTypeInBody,
+        new_rate: PositiveFloatInBody,
         ) -> SimpleResponse:
     """
     Edits tariff with a new value of rate.
     Returns status 304 if value is identical or such tariff does not exist.
     """
+    tariff = Tariff(date=tariff_date, cargo_type=cargo_type, rate=new_rate)
     result = await db_requester.edit_tariff(tariff)
     if result is None:
         raise HTTPException(status.HTTP_304_NOT_MODIFIED)
