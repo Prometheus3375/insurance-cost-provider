@@ -56,26 +56,39 @@ type RawCargoType = Annotated[str, StringConstraints(min_length=1, max_length=50
 
 class CargoType(BaseModel, frozen=True, from_attributes=True):
     """
-    Model for tariffs of a certain date.
+    Model for cargo types.
     """
+    id: PositiveInt
+    name: RawCargoType
+
+
+class Tariff(BaseModel, frozen=True, from_attributes=True):
+    """
+    Model for tariffs.
+    """
+    date: date
     cargo_type: CargoType
     rate: PositiveFloat
 
 
-def _format_index_list(indexes: list[int], /) -> str:
-    return f'{', '.join(map(str, indexes[:-1]))} and {indexes[-1]}'
-
-
-def validate_tariff_list(li: list[Tariff], /) -> list[Tariff]:
+class PlainTariff(BaseModel, frozen=True):
     """
-    Validates that a tariff list has one instance of :class:`Tariff` per cargo type.
+    Model for tariffs without dates and proper cargo types.
+    """
+    cargo_type: RawCargoType
+    rate: PositiveFloat
+
+
+def validate_tariff_list(li: list[PlainTariff], /) -> list[PlainTariff]:
+    """
+    Validates that a tariff list has one instance of :class:`PlainTariff` per cargo type.
     """
     ct2indexes = defaultdict(list)
     for i, tariff in enumerate(li):
         ct2indexes[tariff.cargo_type].append(i)
 
     errors = [
-        f'at indexes {_format_index_list(indexes)} '
+        f'at indexes {', '.join(map(str, indexes[:-1]))} and {indexes[-1]} '
         f'share the same cargo type {cargo_type!r}'
         for cargo_type, indexes in ct2indexes.items()
         if len(indexes) > 1
@@ -86,26 +99,16 @@ def validate_tariff_list(li: list[Tariff], /) -> list[Tariff]:
     return li
 
 
-type TariffList = Annotated[list[Tariff], AfterValidator(validate_tariff_list)]
-type TariffData = dict[date, TariffList]
-
-
-class Settings(BaseSettings, env_ignore_empty=True):
-    """
-    Model for holding server settings.
-    """
-    database_uri: NonEmptyString
-    connection_pool_min_size: NonNegativeInt = 1
-    connection_pool_max_size: NonNegativeInt | None = None
-
-    kafka_uri: NonEmptyString
-
+type PlainTariffList = Annotated[list[PlainTariff], AfterValidator(validate_tariff_list)]
+type PlainTariffData = dict[date, PlainTariffList]
 
 __all__ = (
     'NonEmptyString',
+    'RawCargoType',
     'CargoType',
     'Tariff',
-    'TariffList',
-    'TariffData',
+    'PlainTariff',
+    'PlainTariffList',
+    'PlainTariffData',
     'Settings',
     )
