@@ -101,7 +101,7 @@ class DatabaseRequester:
         result = await self._session.scalars(query)
         li = [row.to_model() for row in result]
         for t in li:
-            logger.info(f'Added or updated tariff {t}')
+            logger.info(f'Upserted tariff {t}')
             # todo log all added rows to kafka
 
         return li
