@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
+from datetime import date
 from logging import getLogger
 from typing import Annotated
 
@@ -60,6 +61,8 @@ async def make_db_requester() -> Iterator[DatabaseRequester]:
 
 # https://github.com/fastapi/fastapi/issues/10719
 DBRequester = Annotated[DatabaseRequester, Depends(make_db_requester)]
+DateInBody = Annotated[date, Body(embed=True)]
+CargoTypeInBody = Annotated[CargoType, Body(embed=True)]
 logger = getLogger(__name__)
 app = FastAPI(
     title='Cost Evaluation API',
@@ -93,22 +96,23 @@ async def validation_exception_handler(
 async def api_evaluate_cost(
         *,
         db_requester: DBRequester,
-        tariff_type: TariffType,
+        ensurance_date: DateInBody,
+        cargo_type: CargoTypeInBody,
         declared_price: Annotated[PositiveFloat, Body(embed=True)],
         ) -> PositiveFloat:
     """
-    Evaluates cost using specified tariff type and declared price.
-    Returns status 404 if specified tariff type does not exist.
+    Evaluates cost using specified date, cargo type and declared price.
+    Returns status 404 if tariff for such date and cargo type does not exist.
     """
     tariff = await db_requester.fetch_tariff(
-        ensurance_date=tariff_type.date,
-        cargo_type=tariff_type.cargo_type,
+        ensurance_date=ensurance_date,
+        cargo_type=cargo_type,
         )
 
     if tariff is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f'Tariff for {tariff_type.cargo_type!r} on {tariff_type.date} is not found',
+            detail=f'Tariff for {cargo_type!r} on {ensurance_date} is not found',
             )
 
     return tariff.rate * declared_price
@@ -159,21 +163,22 @@ async def api_edit_tariff(
 async def api_delete_tariff(
         *,
         db_requester: DBRequester,
-        tariff_type: Annotated[TariffType, Body()],
+        tariff_date: DateInBody,
+        cargo_type: CargoTypeInBody,
         ) -> Tariff:
     """
     Deletes tariff specified by its date and cargo type.
     Returns status 404 if such tariff does not exist.
     """
     result = await db_requester.delete_tariff(
-        ensurance_date=tariff_type.date,
-        cargo_type=tariff_type.cargo_type,
+        ensurance_date=tariff_date,
+        cargo_type=cargo_type,
         )
 
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f'Tariff for {tariff_type.cargo_type!r} on {tariff_type.date} is not found',
+            detail=f'Tariff for {cargo_type!r} on {tariff_date} is not found',
             )
 
     return result
