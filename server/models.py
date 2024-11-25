@@ -119,12 +119,11 @@ type PlainTariffList = Annotated[
 type PlainTariffData = Annotated[dict[date, PlainTariffList], AfterValidator(validate_tariff_data)]
 
 __all__ = (
-    'NonEmptyString',
-    'RawCargoType',
+    'Settings',
     'CargoType',
-    'Tariff',
     'PlainTariff',
+    'TariffType',
+    'Tariff',
     'PlainTariffList',
     'PlainTariffData',
-    'Settings',
     )
