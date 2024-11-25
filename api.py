@@ -10,6 +10,7 @@ from fastapi.exceptions import HTTPException, RequestValidationError
 from pydantic import PositiveFloat
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from starlette import status
+from starlette.responses import JSONResponse
 
 from server.db import *
 from server.models import *
@@ -90,7 +91,11 @@ app = FastAPI(
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError, /):
+async def validation_exception_handler(
+        request: Request,
+        exc: RequestValidationError,
+        /,
+        ) -> JSONResponse:
     """
     Request validation handler which logs errors caused by request validation in detail.
     """
