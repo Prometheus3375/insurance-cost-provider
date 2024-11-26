@@ -1,7 +1,8 @@
 from collections import defaultdict
-from datetime import date
+from datetime import date as _date
 from typing import Annotated, Literal
 
+from annotated_types import Len
 from pydantic import (
     AfterValidator,
     BaseModel,
@@ -77,7 +78,7 @@ class Tariff(PlainTariff, frozen=True, from_attributes=True):
     """
     Model for tariffs.
     """
-    date: date
+    date: _date
 
 
 def validate_tariff_list(li: list[PlainTariff], /) -> list[PlainTariff]:
@@ -100,20 +101,11 @@ def validate_tariff_list(li: list[PlainTariff], /) -> list[PlainTariff]:
     return li
 
 
-def validate_tariff_data(d: dict[date, list[PlainTariff]], /) -> dict[date, list[PlainTariff]]:
-    """
-    Validates that tariff data is non-empty.
-    """
-    if d: return d
-
-    raise ValueError(f'tariff data must be non-empty')
-
-
 type PlainTariffList = Annotated[
     conlist(PlainTariff, min_length=1),
     AfterValidator(validate_tariff_list),
 ]
-type PlainTariffData = Annotated[dict[date, PlainTariffList], AfterValidator(validate_tariff_data)]
+type PlainTariffData = Annotated[dict[_date, PlainTariffList], Len(min_length=1)]
 
 
 class SimpleResponse(BaseModel, frozen=True):
