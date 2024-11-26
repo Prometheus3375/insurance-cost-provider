@@ -150,7 +150,7 @@ async def api_load_tariffs(
     return await db_requester.add_tariffs(*tariffs)
 
 
-@app.post('/api/internal/tariffs/edit', responses=ResponseTariffNotModified)
+@app.post('/api/internal/tariffs/update', responses=ResponseTariffNotModified)
 async def api_edit_tariff(
         *,
         db_requester: DBRequester,
@@ -163,7 +163,7 @@ async def api_edit_tariff(
     Returns status 304 if value is identical or such tariff does not exist.
     """
     tariff = Tariff(date=tariff_date, cargo_type=cargo_type, rate=new_rate)
-    result = await db_requester.edit_tariff(tariff)
+    result = await db_requester.update_tariff(tariff)
     if result is None:
         raise HTTPException(status.HTTP_304_NOT_MODIFIED)
 

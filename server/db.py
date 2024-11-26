@@ -108,9 +108,9 @@ class DatabaseRequester:
 
         return li
 
-    async def edit_tariff(self, tariff: Tariff, /) -> Tariff | None:
+    async def update_tariff(self, tariff: Tariff, /) -> Tariff | None:
         """
-        Edits specified tariff via updating its rate value.
+        Updates specified tariff via updating its rate value.
         Returns the updated tariff or ``None``
         if such tariff does not exist, or it already has such value for rate.
         """
@@ -128,8 +128,8 @@ class DatabaseRequester:
         result = (await self._session.scalars(query)).first()
         if result:
             new_tariff = result.to_model()
-            logger.info(f'Edited tariff {new_tariff}')
             # todo log action to kafka
+            logger.info(f'Update tariff {new_tariff}')
             return new_tariff
 
         return None
