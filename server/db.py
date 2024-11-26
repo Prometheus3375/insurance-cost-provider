@@ -15,6 +15,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+from server.broker import Broker
 from server.models import CargoType, Tariff
 
 logger = getLogger(__name__)
@@ -50,10 +51,12 @@ class DatabaseRequester:
     """
     A class for querying the database.
     """
-    __slots__ = '_session',
+    __slots__ = '_user', '_session', '_broker'
 
-    def __init__(self, session: AsyncSession, /) -> None:
+    def __init__(self, db_user: str, session: AsyncSession, broker: Broker, /) -> None:
+        self._user = db_user
         self._session = session
+        self._broker = broker
 
     async def fetch_tariff(
             self,
@@ -104,7 +107,7 @@ class DatabaseRequester:
         li = [row.to_model() for row in result]
         for t in li:
             logger.info(f'Upserted tariff {t}')
-            # todo log all added rows to kafka
+            await self._broker.log(self._user, 'upsert', str(t))
 
         return li
 
@@ -128,8 +131,8 @@ class DatabaseRequester:
         result = (await self._session.scalars(query)).first()
         if result:
             new_tariff = result.to_model()
-            # todo log action to kafka
             logger.info(f'Update tariff {new_tariff}')
+            await self._broker.log(self._user, 'update', str(new_tariff))
             return new_tariff
 
         return None
@@ -159,7 +162,7 @@ class DatabaseRequester:
         if result:
             tariff = result.to_model()
             logger.info(f'Deleted tariff {tariff}')
-            # todo log action to kafka
+            await self._broker.log(self._user, 'delete', str(tariff))
             return tariff
 
         return None
