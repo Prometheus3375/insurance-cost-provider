@@ -54,7 +54,9 @@ async def lifespan(_: FastAPI, /) -> Iterator[None]:
         sasl_plain_username=settings.kafka_username,
         sasl_plain_password=settings.kafka_password,
         )
+    logger.info(f'Starting Kafka producer {settings.kafka_client_name}')
     await producer.start()
+    logger.info(f'Producing to Kafka at {settings.kafka_servers}')
 
     yield
     # Actions on shutdown
