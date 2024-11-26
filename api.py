@@ -4,28 +4,28 @@ from datetime import date
 from logging import getLogger
 from typing import Annotated
 
+from aiokafka import AIOKafkaProducer
 from fastapi import Body, Depends, FastAPI, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import PositiveFloat
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncConnection, async_sessionmaker, create_async_engine
 from starlette import status
 
+from server.broker import Broker
 from server.db import *
 from server.models import *
 
 settings: Settings
-engine: AsyncEngine
 session_maker: async_sessionmaker
+producer: AIOKafkaProducer
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI, /) -> Iterator[None]:
     # Actions on startup
-    from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
-
-    global settings, engine, session_maker
+    global settings, session_maker, producer
     settings = Settings()
 
     engine = create_async_engine(
@@ -46,17 +46,42 @@ async def lifespan(_: FastAPI, /) -> Iterator[None]:
         # Ensure tables exist
         await connection.run_sync(BaseTable.metadata.create_all)
 
+    producer = AIOKafkaProducer(
+        bootstrap_servers=settings.kafka_servers,
+        client_id=settings.kafka_client_name,
+        security_protocol=settings.kafka_security_protocol,
+        sasl_mechanism=settings.kafka_auth_mechanism,
+        sasl_plain_username=settings.kafka_username,
+        sasl_plain_password=settings.kafka_password,
+        )
+    await producer.start()
+
     yield
     # Actions on shutdown
     await engine.dispose()
+    await producer.stop()
 
 
-async def make_db_requester() -> Iterator[DatabaseRequester]:
+async def make_broker() -> Iterator[Broker]:
+    """
+    Dependency function for creating an instance of :class:`Broker`.
+    """
+    broker = Broker(settings, producer)
+    try:
+        yield broker
+    finally:
+        await broker.flush()
+
+
+async def make_db_requester(
+        *,
+        broker: Annotated[Broker, Depends(make_broker)],
+        ) -> Iterator[DatabaseRequester]:
     """
     Dependency function for creating an instance of :class:`DatabaseRequester`.
     """
     async with session_maker.begin() as session:
-        yield DatabaseRequester(session)
+        yield DatabaseRequester(settings.database_user, session, broker)
 
 
 # https://github.com/fastapi/fastapi/issues/10719
