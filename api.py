@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, async_sessionmaker, create_a
 from starlette import status
 
 from server.broker import Broker
-from server.db import *
+from server.db import BaseTable, DatabaseRequester
 from server.models import *
 
 settings: Settings
