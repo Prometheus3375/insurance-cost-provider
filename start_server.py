@@ -8,7 +8,7 @@ if __name__ == '__main__':
 
     params = dict(
         app=app,
-        env_file='.env',
+        env_file='local.env',
         port=2127,
         log_config='server/logging-config.json',
         )
