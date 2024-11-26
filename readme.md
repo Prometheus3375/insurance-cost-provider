@@ -34,7 +34,7 @@ If there is no database deployed, you can deploy PostgreSQL 17 locally via Docke
 docker run -d --name postgresql -p5432:5432 -v $HOME/postgresql:/var/lib/postgresql/data -e POSTGRES_PASSWORD=mysecretpassword postgres:17
 ```
 
-Once it is running, add lines below to `local.env`.
+Once it is running, add lines below to file `local.env`.
 
 ```
 DATABASE_USER=postgres
