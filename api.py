@@ -134,7 +134,7 @@ ResponseTariffNotModified = {
 async def api_evaluate_cost(
         *,
         db_requester: DBRequester,
-        ensurance_date: DateInBody,
+        insurance_date: DateInBody,
         cargo_type: CargoTypeInBody,
         declared_price: PositiveFloatInBody,
         ) -> PositiveFloat:
@@ -143,14 +143,14 @@ async def api_evaluate_cost(
     Returns status 404 if tariff for such date and cargo type does not exist.
     """
     tariff = await db_requester.fetch_tariff(
-        tariff_date=ensurance_date,
+        tariff_date=insurance_date,
         cargo_type=cargo_type,
         )
 
     if tariff is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f'Tariff for {cargo_type!r} on {ensurance_date} is not found',
+            detail=f'Tariff for {cargo_type!r} on {insurance_date} is not found',
             )
 
     return tariff.rate * declared_price
