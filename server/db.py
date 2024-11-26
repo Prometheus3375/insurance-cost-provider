@@ -33,6 +33,7 @@ class TariffTable(BaseTable):
     cargo_type: Mapped[str] = mapped_column(String(50), nullable=False)
     rate: Mapped[float] = mapped_column(Double, nullable=False)
 
+    # noinspection PyTypeChecker
     __table_args__ = (
         PrimaryKeyConstraint(date, cargo_type, name='unique_date_cargo_type'),
         )
@@ -65,6 +66,7 @@ class DatabaseRequester:
         Fetches tariff for the given date and cargo type,
         then returns :class:`Tariff` or ``None`` if no such tariff exists.
         """
+        # noinspection PyTypeChecker
         query = (
             select(TariffTable)
             .where(
@@ -112,6 +114,7 @@ class DatabaseRequester:
         Returns the updated tariff or ``None``
         if such tariff does not exist, or it already has such value for rate.
         """
+        # noinspection PyTypeChecker
         query = (
             update(TariffTable)
             .where(
@@ -143,6 +146,7 @@ class DatabaseRequester:
         Returns the deleted tariff or ``None``
         if such tariff does not exist.
         """
+        # noinspection PyTypeChecker
         query = (
             delete(TariffTable)
             .where(

@@ -146,6 +146,7 @@ async def api_load_tariffs(
         for date_, plain_tariff_list in data.items()
         for plain_tariff in plain_tariff_list
         )
+    # noinspection PyArgumentList
     return await db_requester.add_tariffs(*tariffs)
 
 
