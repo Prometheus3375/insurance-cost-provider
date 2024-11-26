@@ -1,9 +1,5 @@
 name: insurance-cost-provider
 
-#networks:
-#  redpanda_network:
-#    driver: bridge
-
 volumes:
   db: null
   redpanda: null
@@ -12,8 +8,6 @@ services:
   server:
     container_name: server
     build: .
-    #    networks:
-    #      - redpanda_network
     ports:
       - 2127:2127
     env_file: '.env'
@@ -23,10 +17,10 @@ services:
   db:
     container_name: db
     image: postgres:17
-    ports:
-      - 5432:5432
     volumes:
       - db:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
     environment:
       - POSTGRES_USER=${DATABASE_USER}
       - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
@@ -60,8 +54,6 @@ services:
       - --default-log-level=info
     volumes:
       - redpanda:/var/lib/redpanda/data
-    #    networks:
-    #      - redpanda_network
     ports:
       - 18081:18081
       - 18082:18082
@@ -72,8 +64,8 @@ services:
     image: docker.redpanda.com/redpandadata/console:v2.7.2
     command: -c 'echo "$$CONSOLE_CONFIG_FILE" > /tmp/config.yml; /app/console'
     entrypoint: /bin/sh
-    #    networks:
-    #      - redpanda_network
+    ports:
+      - 8080:8080
     environment:
       CONFIG_FILEPATH: /tmp/config.yml
       CONSOLE_CONFIG_FILE: |
@@ -86,7 +78,5 @@ services:
           adminApi:
             enabled: true
             urls: ["http://redpanda:9644"]
-    ports:
-      - 8080:8080
     depends_on:
       - redpanda
