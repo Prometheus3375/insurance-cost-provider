@@ -167,6 +167,8 @@ async def api_load_tariffs(
     If any tariff from the payload already exists in the database,
     then updates its rate value if new one is different.
     Returns the list of added and updated tariffs.
+
+    Payload must not be an empty dictionary.
     """
     tariffs = (
         Tariff(date=date_, cargo_type=plain_tariff.cargo_type, rate=plain_tariff.rate)
