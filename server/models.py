@@ -14,6 +14,8 @@ from pydantic import (
 from pydantic_settings import BaseSettings
 
 type NonEmptyString = Annotated[str, StringConstraints(min_length=1)]
+type KafkaSecurityProtocol = Literal['PLAINTEXT', 'SSL', 'SASL_PLAINTEXT', 'SASL_SSL']
+type SASLAuthMechanism = Literal['PLAIN', 'GSSAPI', 'SCRAM-SHA-256', 'SCRAM-SHA-512', 'OAUTHBEARER']
 
 
 class Settings(BaseSettings, env_ignore_empty=True):
@@ -30,6 +32,14 @@ class Settings(BaseSettings, env_ignore_empty=True):
     pool_overflow: NonNegativeInt = 10
     pool_recycle: PositiveFloat | Literal[-1] = 3600
     pool_timeout: PositiveFloat = 30
+
+    kafka_servers: NonEmptyString
+    kafka_topic: NonEmptyString
+    kafka_client_name: NonEmptyString | None = 'crud-log-producer'
+    kafka_security_protocol: KafkaSecurityProtocol = 'PLAINTEXT'
+    kafka_auth_mechanism: SASLAuthMechanism = 'PLAIN'
+    kafka_username: NonEmptyString | None = None
+    kafka_password: NonEmptyString | None = None
 
     @property
     def database_uri(self, /) -> str:
